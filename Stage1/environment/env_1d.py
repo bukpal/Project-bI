@@ -20,7 +20,7 @@ class Env1d(gym.Env):
             0: speed, px/sec
             1: turn, radians 
         """
-        self.action_space = spaces.Box(low=[0, -2 * np.pi], high=[100, 2 * np.pi])
+        self.action_space = spaces.Box(low=np.array([0, -2 * np.pi]), high=np.array([100, 2 * np.pi]))
 
         """
         Observation space = State:
@@ -29,8 +29,8 @@ class Env1d(gym.Env):
             2: direction theta, radians from x axis ccw
             3: speed, px/s
         """
-        self.observation_space = spaces.Box(low=[0, 0, 0, 0],
-                                            high=[self.plan.shape[0], self.plan.shape[1], 2 * np.pi, 100])
+        self.observation_space = spaces.Box(low=np.array([0, 0, 0, 0]),
+                                            high=np.array([self.plan.shape[0], self.plan.shape[1], 2 * np.pi, 100]))
 
         self.drone_coordinates = None
         self.state = None
@@ -68,6 +68,10 @@ class Env1d(gym.Env):
         if self.viewer is None:
             from gym.envs.classic_control import rendering
             self.viewer = rendering.Viewer(screen_width, screen_height)
+            drone = rendering.FilledPolygon([(-20, -5), (-20, 5), (0, 0)])
+            self.dronetrans = rendering.Transform()
+            drone.add_attr(self.dronetrans)
+            self.viewer.add_geom(drone)
 
         # TODO: add plan
         # gym doesn't work with images, only primitive forms, so need to find a way to draw a np.array
@@ -76,7 +80,16 @@ class Env1d(gym.Env):
         if self.state is None:
             return None
 
+        x, y, theta, _ = self.state
+        self.dronetrans.set_translation(x, y)
+        self.dronetrans.set_rotation(theta)
+
         return self.viewer.render(return_rgb_array=mode == 'rgb_array')
+
+    def close(self):
+        if self.viewer:
+            self.viewer.close()
+            self.viewer = None
 
     @staticmethod
     def load_plan(file: str) -> np.array:
@@ -84,7 +97,7 @@ class Env1d(gym.Env):
         Read plan *file* in 'jpg' format and returns plan array.
         """
         assert os.path.isfile(file), f"No file '{file}' exist to read. Please check file name and path."
-        return cv.imread(file)
+        return cv2.imread(file)
 
     @staticmethod
     def save_plan(plan: np.array, file: str):
@@ -99,9 +112,9 @@ class Env1d(gym.Env):
         Shows plan in window until any button is hit.
         Returns key code which was pressed when window closed.
         """
-        cv.imshow(window_name, plan)
-        key_pressed = cv.waitKey(0)
-        cv.destroyWindow(window_name)
+        cv2.imshow(window_name, plan)
+        key_pressed = cv2.waitKey(0)
+        cv2.destroyWindow(window_name)
         return key_pressed
 
     def show_layers(self, *layers, **kwargs):
